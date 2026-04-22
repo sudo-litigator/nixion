@@ -2,7 +2,9 @@
 
 `nixion` is a Rust TUI for managing flakes, NixOS configurations, user profile packages, and system generations from the terminal.
 
-## Scope
+It focuses on the operational workflow around a NixOS machine: inspect the current system, search and install user packages, work with a nearby flake, and switch or clean up system generations without leaving the terminal.
+
+## Features
 
 - List installed packages from `nix profile`
 - Search packages in `nixpkgs`
@@ -25,12 +27,14 @@
 
 ## Requirements
 
-- Nix with the modern CLI (`nix profile`, `nix search`)
+- Nix with the modern CLI enabled (`nix profile`, `nix search`, `nix flake`)
 - NixOS for generation management
 - A flake-based NixOS configuration for host rebuild actions
 - `sudo` access for generation actions
 
 ## Development
+
+With flakes:
 
 ```bash
 nix develop
@@ -41,6 +45,12 @@ Without flakes:
 
 ```bash
 nix shell nixpkgs#cargo nixpkgs#rustc nixpkgs#rustfmt --command cargo run
+```
+
+Run tests:
+
+```bash
+cargo test
 ```
 
 ## Controls
@@ -68,7 +78,7 @@ nix shell nixpkgs#cargo nixpkgs#rustc nixpkgs#rustfmt --command cargo run
 - `o`: delete old generations on the generations tab
 - `q`: quit
 
-## Notes
+## Behavior Notes
 
 - Package actions target the current user's `nix profile`, not declarative system packages in `configuration.nix`.
 - Flake detection prefers a flake with `nixosConfigurations`; otherwise it falls back to the first usable flake it finds.
@@ -78,3 +88,7 @@ nix shell nixpkgs#cargo nixpkgs#rustc nixpkgs#rustfmt --command cargo run
 - The generations tab shows the boot target from `/nix/var/nix/profiles/system` separately from the currently running system at `/run/current-system`.
 - Cleanup of old generations is only enabled when the running system already matches the boot generation.
 - The rollback dialog always targets the next older generation after the current boot entry.
+
+## License
+
+MIT. See [`LICENSE`](LICENSE).
