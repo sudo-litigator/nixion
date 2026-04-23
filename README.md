@@ -4,6 +4,28 @@
 
 It focuses on the operational workflow around a NixOS machine: inspect the current system, search and install user packages, work with a nearby flake, and switch or clean up system generations without leaving the terminal.
 
+## Quick Start
+
+With flakes:
+
+```bash
+nix develop
+cargo run
+```
+
+Without flakes:
+
+```bash
+nix shell nixpkgs#cargo nixpkgs#rustc nixpkgs#rustfmt --command cargo run
+```
+
+Run the built binary directly:
+
+```bash
+cargo run -- --help
+cargo run -- --version
+```
+
 ## Features
 
 - List installed packages from `nix profile`
@@ -32,20 +54,20 @@ It focuses on the operational workflow around a NixOS machine: inspect the curre
 - A flake-based NixOS configuration for host rebuild actions
 - `sudo` access for generation actions
 
+## Usage
+
+```text
+Usage:
+  nixion [OPTIONS]
+
+Options:
+  -h, --help       Print help
+  -V, --version    Print version
+```
+
+Start `nixion` without arguments to open the TUI.
+
 ## Development
-
-With flakes:
-
-```bash
-nix develop
-cargo run
-```
-
-Without flakes:
-
-```bash
-nix shell nixpkgs#cargo nixpkgs#rustc nixpkgs#rustfmt --command cargo run
-```
 
 Run tests:
 
@@ -55,6 +77,7 @@ cargo test
 
 ## Controls
 
+- Global: `Left` / `Right` switch tabs, `j` / `k` or `Down` / `Up` move selection, `r` refresh, `q` quit
 - `Left` / `Right`: switch tabs
 - `j` / `k` or `Down` / `Up`: move selection
 - `r`: refresh current tab
@@ -77,6 +100,13 @@ cargo test
 - `x`: delete selected generation
 - `o`: delete old generations on the generations tab
 - `q`: quit
+
+## Tabs
+
+- Flake: inspect the detected flake, browse available `nixosConfigurations`, and run update/check/format or rebuild actions for the selected host.
+- Installed: inspect packages from the current user's `nix profile` and remove the selected package.
+- Search: enter a package query, browse `nixpkgs` search results, and install the selected package into the current user profile.
+- Generations: inspect system generations, filter long histories, preview rollback targets, activate or test older systems, and clean up obsolete generations.
 
 ## Behavior Notes
 
