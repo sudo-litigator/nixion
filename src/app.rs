@@ -8,6 +8,12 @@ use crate::nix::{
     SearchPackage,
 };
 
+#[derive(Clone, Debug, Default)]
+pub struct AppOptions {
+    pub flake_path: Option<PathBuf>,
+    pub host: Option<String>,
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ActiveTab {
     Flake,
@@ -83,11 +89,12 @@ pub struct App {
     pub generation_state: ListState,
     pub should_quit: bool,
     pending_action: Option<PendingAction>,
+    options: AppOptions,
     client: NixClient,
 }
 
 impl App {
-    pub fn new(client: NixClient) -> Self {
+    pub fn new_with_options(client: NixClient, options: AppOptions) -> Self {
         let mut flake_hosts_state = ListState::default();
         flake_hosts_state.select(Some(0));
 
@@ -116,6 +123,7 @@ impl App {
             generation_state,
             should_quit: false,
             pending_action: None,
+            options,
             client,
         }
     }
@@ -347,12 +355,11 @@ impl App {
     }
 
     fn refresh_flake(&mut self) -> Result<()> {
-        let flake_info = self.client.discover_flake()?;
-        let selected_host = flake_info
-            .hosts
-            .iter()
-            .position(|host| host.current)
-            .or(Some(0));
+        let flake_info = match &self.options.flake_path {
+            Some(path) => self.client.discover_flake_at(path)?,
+            None => self.client.discover_flake()?,
+        };
+        let selected_host = self.resolve_selected_host(&flake_info)?;
 
         self.flake_info = Some(flake_info);
 
@@ -370,14 +377,41 @@ impl App {
         }
 
         if let Some(flake) = &self.flake_info {
+            let selected = flake
+                .hosts
+                .get(selected_host.unwrap_or_default())
+                .map(|host| host.name.as_str())
+                .unwrap_or("none");
             self.status = format!(
-                "Loaded flake {} with {} host(s)",
+                "Loaded flake {} with {} host(s); selected host {}",
                 flake.path.display(),
-                flake.hosts.len()
+                flake.hosts.len(),
+                selected
             );
         }
 
         Ok(())
+    }
+
+    fn resolve_selected_host(&self, flake_info: &FlakeInfo) -> Result<Option<usize>> {
+        if flake_info.hosts.is_empty() {
+            return Ok(None);
+        }
+
+        if let Some(requested_host) = &self.options.host {
+            let index = flake_info
+                .hosts
+                .iter()
+                .position(|host| host.name == *requested_host)
+                .ok_or_else(|| anyhow!("host '{}' was not found in the selected flake", requested_host))?;
+            return Ok(Some(index));
+        }
+
+        Ok(flake_info
+            .hosts
+            .iter()
+            .position(|host| host.current)
+            .or(Some(0)))
     }
 
     fn refresh_installed(&mut self) -> Result<()> {
@@ -937,12 +971,13 @@ fn select_by_offset(state: &mut ListState, len: usize, offset: isize) {
 mod tests {
     use ratatui::widgets::ListState;
 
-    use super::App;
-    use crate::nix::{Generation, NixClient};
+    use super::{App, AppOptions};
+    use crate::nix::{FlakeHost, FlakeInfo, Generation, NixClient};
+    use std::path::PathBuf;
 
     #[test]
     fn filters_generations_by_query() {
-        let mut app = App::new(NixClient::default());
+        let mut app = App::new_with_options(NixClient::default(), AppOptions::default());
         app.generations = vec![
             generation(28, "nixos-system-workstation", true, true),
             generation(27, "nixos-system-server", false, false),
@@ -957,7 +992,7 @@ mod tests {
 
     #[test]
     fn cleanup_preview_keeps_boot_generation() {
-        let mut app = App::new(NixClient::default());
+        let mut app = App::new_with_options(NixClient::default(), AppOptions::default());
         app.generations = vec![
             generation(28, "nixos-system-workstation", true, true),
             generation(27, "nixos-system-rollback", false, false),
@@ -972,6 +1007,36 @@ mod tests {
         assert_eq!(preview.2, "27, 26");
     }
 
+    #[test]
+    fn selects_requested_host_when_present() {
+        let app = App::new_with_options(
+            NixClient::default(),
+            AppOptions {
+                flake_path: None,
+                host: Some(String::from("server")),
+            },
+        );
+
+        let selected = app.resolve_selected_host(&flake_info()).unwrap();
+
+        assert_eq!(selected, Some(1));
+    }
+
+    #[test]
+    fn rejects_unknown_requested_host() {
+        let app = App::new_with_options(
+            NixClient::default(),
+            AppOptions {
+                flake_path: None,
+                host: Some(String::from("missing")),
+            },
+        );
+
+        let error = app.resolve_selected_host(&flake_info()).unwrap_err();
+
+        assert!(error.to_string().contains("host 'missing' was not found"));
+    }
+
     fn generation(generation: u32, summary: &str, booted: bool, running: bool) -> Generation {
         Generation {
             generation,
@@ -980,6 +1045,28 @@ mod tests {
             age: String::from("1h ago"),
             booted,
             running,
+        }
+    }
+
+    fn flake_info() -> FlakeInfo {
+        FlakeInfo {
+            path: PathBuf::from("/tmp/nixion"),
+            description: String::from("test flake"),
+            url: String::from("path:/tmp/nixion"),
+            revision: String::from("workspace"),
+            last_modified: String::from("unknown"),
+            input_count: 0,
+            hosts: vec![
+                FlakeHost {
+                    name: String::from("desktop"),
+                    current: true,
+                },
+                FlakeHost {
+                    name: String::from("server"),
+                    current: false,
+                },
+            ],
+            config_files: Vec::new(),
         }
     }
 }

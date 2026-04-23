@@ -88,6 +88,10 @@ impl RebuildAction {
 pub struct NixClient;
 
 impl NixClient {
+    pub fn discover_flake_at(&self, path: &Path) -> Result<FlakeInfo> {
+        self.flake_info(path)
+    }
+
     pub fn discover_flake(&self) -> Result<FlakeInfo> {
         let mut fallback = None;
 

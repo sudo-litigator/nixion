@@ -24,6 +24,7 @@ Run the built binary directly:
 ```bash
 cargo run -- --help
 cargo run -- --version
+cargo run -- --flake /etc/nixos --host workstation
 ```
 
 ## Features
@@ -61,11 +62,15 @@ Usage:
   nixion [OPTIONS]
 
 Options:
+  --flake <path>   Open a specific flake instead of auto-detecting one
+  --host <name>    Preselect a nixosConfiguration host in the TUI
   -h, --help       Print help
   -V, --version    Print version
 ```
 
 Start `nixion` without arguments to open the TUI.
+
+Use `--flake` to bypass automatic flake discovery and `--host` to start with a specific host selected.
 
 ## Development
 
@@ -112,6 +117,8 @@ cargo test
 
 - Package actions target the current user's `nix profile`, not declarative system packages in `configuration.nix`.
 - Flake detection prefers a flake with `nixosConfigurations`; otherwise it falls back to the first usable flake it finds.
+- `--flake <path>` overrides automatic flake discovery and loads that flake directly.
+- `--host <name>` selects a matching `nixosConfigurations` host during startup and fails early if it does not exist in the chosen flake.
 - Host rebuild actions call `sudo nixos-rebuild <action> --flake <path>#<host>`.
 - Generation activation calls the selected generation's `switch-to-configuration` script via `sudo`.
 - Generation actions that change or delete system state require `y` / `n` confirmation in the TUI.
